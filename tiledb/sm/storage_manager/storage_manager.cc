@@ -80,8 +80,9 @@ StorageManager::StorageManager(
     ThreadPool* const io_tp,
     stats::Stats* const parent_stats,
     tdb_shared_ptr<Logger> logger)
-    : stats_(parent_stats->create_child("StorageManager"))
-    , logger_(logger->clone("Context", ++logger_id_))
+    : Observable<StorageManager>(
+          parent_stats->create_child("StorageManager"),
+          logger->clone("Context", ++logger_id_))
     , cancellation_in_progress_(false)
     , queries_in_progress_(0)
     , compute_tp_(compute_tp)
@@ -2462,14 +2463,6 @@ Status StorageManager::write(const URI& uri, Buffer* buffer) const {
 
 Status StorageManager::write(const URI& uri, void* data, uint64_t size) const {
   return vfs_->write(uri, data, size);
-}
-
-stats::Stats* StorageManager::stats() {
-  return stats_;
-}
-
-tdb_shared_ptr<Logger> StorageManager::logger() const {
-  return logger_;
 }
 
 /* ****************************** */

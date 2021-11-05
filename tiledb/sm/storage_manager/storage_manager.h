@@ -47,6 +47,7 @@
 
 #include "tiledb/common/heap_memory.h"
 #include "tiledb/common/logger_public.h"
+#include "tiledb/common/observable.h"
 #include "tiledb/common/status.h"
 #include "tiledb/common/thread_pool.h"
 #include "tiledb/sm/config/config.h"
@@ -82,7 +83,7 @@ enum class EncryptionType : uint8_t;
 enum class ObjectType : uint8_t;
 
 /** The storage manager that manages pretty much everything in TileDB. */
-class StorageManager {
+class StorageManager : public Observable<StorageManager> {
  public:
   /* ********************************* */
   /*          TYPE DEFINITIONS         */
@@ -996,12 +997,6 @@ class StorageManager {
    */
   Status write(const URI& uri, void* data, uint64_t size) const;
 
-  /** Returns `stats_`. */
-  stats::Stats* stats();
-
-  /** Returns the internal logger object. */
-  tdb_shared_ptr<Logger> logger() const;
-
  private:
   /* ********************************* */
   /*        PRIVATE DATATYPES          */
@@ -1033,15 +1028,6 @@ class StorageManager {
   /* ********************************* */
   /*        PRIVATE ATTRIBUTES         */
   /* ********************************* */
-
-  /** The class stats. */
-  stats::Stats* stats_;
-
-  /** The class logger. */
-  tdb_shared_ptr<Logger> logger_;
-
-  /** UID of the logger instance */
-  inline static std::atomic<uint64_t> logger_id_ = 0;
 
   /** Set to true when tasks are being cancelled. */
   bool cancellation_in_progress_;

@@ -58,7 +58,7 @@ Logger::Logger(const std::string& name, const Logger::Format format)
   }
   set_format(format);
   set_level(Logger::Level::ERR);
-  if (++instance_count == 1 && format == Logger::Format::JSON) {
+  if (++instance_count_ == 1 && format == Logger::Format::JSON) {
     // If this is the first logger created set up the opening brace and an
     // array named "log"
     logger_->set_pattern("{\n \"log\": [");
@@ -71,7 +71,7 @@ Logger::Logger(std::shared_ptr<spdlog::logger> logger) {
 }
 
 Logger::~Logger() {
-  if (--instance_count == 0 && fmt_ == Logger::Format::JSON) {
+  if (--instance_count_ == 0 && fmt_ == Logger::Format::JSON) {
     // If this is the last logger being destroyed, set the same log format,
     // without the "," at the end
     std::string last_log_pattern = {
@@ -252,7 +252,7 @@ tdb_shared_ptr<Logger> Logger::clone(const std::string& tag, uint64_t id) {
   std::string new_tags = add_tag(tag, id);
   auto new_logger = tdb_make_shared(Logger, logger_->clone(new_tags));
   new_logger->set_name(new_tags);
-  ++instance_count;
+  ++instance_count_;
   return new_logger;
 }
 
