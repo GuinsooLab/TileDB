@@ -406,8 +406,6 @@ Status FilterPipeline::run_reverse_internal(
 
   current_tile_ = tile;
 
-  // CompressionFilter::zstd_decompress_context().resize(compute_tp->concurrency_level());
-
   // First make a pass over the tile to get the chunk information.
   filtered_buffer->reset_offset();
   uint64_t num_chunks;

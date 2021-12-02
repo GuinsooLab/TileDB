@@ -99,7 +99,7 @@ class ResourcePool {
   ResourcePool(unsigned int n)
       : resources_(n)
       , unused_(n)
-      , unused_idx_(n - 1) {
+      , unused_idx_(0) {
     for (unsigned int i = 0; i < n; i++)
       unused_[i] = i;
   }
@@ -107,20 +107,28 @@ class ResourcePool {
   /** Take a resource from the pool. */
   resource_handle take() {
     std::lock_guard x(m_);
-    if (unused_idx_ == -1)
+    if (unused_idx_ == resources_.size())
       throw std::runtime_error("Ran out of resources in resource pool");
-    return ResourceHandle(*this, unused_[unused_idx_--]);
+    return ResourceHandle(*this, unused_[unused_idx_++]);
   }
 
-  void resize(int n) {
+  /** Extend the size of the pool if n is larger than current size */
+  void extend(unsigned int n) {
+    std::lock_guard x(m_);
+    auto previous_n = resources_.size();
+    if (n <= previous_n)
+      return;
     resources_.resize(n);
+    unused_.resize(unused_.size() + n - previous_n);
+    for (unsigned int i = previous_n - 1; i < n; i++)
+      unused_[i] = i;
   }
 
  private:
   /** Release a resource from the pool. */
   void release(unsigned int n) {
     std::lock_guard x(m_);
-    unused_[++unused_idx_] = n;
+    unused_[--unused_idx_] = n;
   }
 
   /** Access a resource from the internal vector. */
@@ -135,7 +143,7 @@ class ResourcePool {
   std::vector<unsigned int> unused_;
 
   /** Index of the last valid resource in the unused vector. */
-  int unused_idx_;
+  uint64_t unused_idx_;
 
   /** Mutex protecting unused_ and unused_idx_. */
   std::mutex m_;

@@ -35,6 +35,7 @@
 #include "tiledb/sm/array/array.h"
 #include "tiledb/sm/array_schema/array_schema.h"
 #include "tiledb/sm/filesystem/vfs.h"
+#include "tiledb/sm/filter/compression_filter.h"
 #include "tiledb/sm/fragment/fragment_metadata.h"
 #include "tiledb/sm/misc/parallel_functions.h"
 #include "tiledb/sm/query/query_macros.h"
@@ -630,6 +631,10 @@ Status ReaderBase::unfilter_tiles(
   auto var_size = array_schema_->var_size(name);
   auto nullable = array_schema_->is_nullable(name);
   auto num_tiles = static_cast<uint64_t>(result_tiles->size());
+
+  // configure the context pool needed for ZStd decompressor
+  auto& zstd_context_pool = CompressionFilter::zstd_decompress_context();
+  zstd_context_pool.extend(storage_manager_->compute_tp()->concurrency_level());
 
   auto status = parallel_for(
       storage_manager_->compute_tp(), 0, num_tiles, [&, this](uint64_t i) {

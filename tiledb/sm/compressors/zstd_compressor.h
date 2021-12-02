@@ -85,6 +85,7 @@ class ZStd {
     ZSTD_Decompress_Context()
         : ctx_(ZSTD_createDCtx(), ZSTD_freeDCtx) {
     }
+
     ZSTD_DCtx* ptr() {
       return ctx_.get();
     }

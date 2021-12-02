@@ -122,7 +122,7 @@ void CompressionFilter::set_compression_level(int compressor_level) {
 
 ResourcePool<ZStd::ZSTD_Decompress_Context>&
 CompressionFilter::zstd_decompress_context() {
-  static ResourcePool<ZStd::ZSTD_Decompress_Context> zstd_context_pool(16);
+  static ResourcePool<ZStd::ZSTD_Decompress_Context> zstd_context_pool(1);
   return zstd_context_pool;
 }
 
