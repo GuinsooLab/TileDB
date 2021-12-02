@@ -33,6 +33,8 @@
 #ifndef TILEDB_ZSTD_H
 #define TILEDB_ZSTD_H
 
+#include <zstd.h>
+
 #include "tiledb/common/status.h"
 
 using namespace tiledb::common;
@@ -75,6 +77,21 @@ class ZStd {
 
   /** Returns the compression overhead for the given input. */
   static uint64_t overhead(uint64_t nbytes);
+
+  /** wrapper around the decompress ZST context so that it can be used in a
+   * resource pool */
+  class ZSTD_Decompress_Context {
+   public:
+    ZSTD_Decompress_Context()
+        : ctx_(ZSTD_createDCtx(), ZSTD_freeDCtx) {
+    }
+    ZSTD_DCtx* ptr() {
+      return ctx_.get();
+    }
+
+   private:
+    std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> ctx_;
+  };
 };
 
 }  // namespace sm

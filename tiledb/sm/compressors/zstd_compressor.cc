@@ -33,6 +33,8 @@
 #include "tiledb/sm/compressors/zstd_compressor.h"
 #include "tiledb/common/logger.h"
 #include "tiledb/sm/buffer/buffer.h"
+#include "tiledb/sm/filter/compression_filter.h"
+#include "tiledb/sm/misc/resource_pool.h"
 
 #include <zstd.h>
 #include <iostream>
@@ -86,16 +88,13 @@ Status ZStd::decompress(
     return LOG_STATUS(Status::CompressionError(
         "Failed decompressing with ZStd; invalid buffer format"));
 
-  // Create context
-  std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> ctx(
-      ZSTD_createDCtx(), ZSTD_freeDCtx);
-  if (ctx.get() == nullptr)
-    return LOG_STATUS(Status::CompressionError(
-        std::string("ZStd decompression failed; could not allocate context.")));
+  // Create context once per thread
+  ResourceGuard context_guard(CompressionFilter::zstd_decompress_context());
+  auto& context = context_guard.get();
 
   // Decompress
   uint64_t zstd_ret = ZSTD_decompressDCtx(
-      ctx.get(),
+      context.ptr(),
       output_buffer->cur_data(),
       output_buffer->free_space(),
       input_buffer->data(),

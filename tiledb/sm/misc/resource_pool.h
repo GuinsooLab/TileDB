@@ -34,6 +34,8 @@
 #ifndef RESOURCE_POOL_H
 #define RESOURCE_POOL_H
 
+#include <vector>
+
 namespace tiledb {
 namespace sm {
 
@@ -108,6 +110,10 @@ class ResourcePool {
     if (unused_idx_ == -1)
       throw std::runtime_error("Ran out of resources in resource pool");
     return ResourceHandle(*this, unused_[unused_idx_--]);
+  }
+
+  void resize(int n) {
+    resources_.resize(n);
   }
 
  private:

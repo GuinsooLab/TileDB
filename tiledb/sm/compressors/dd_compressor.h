@@ -198,4 +198,4 @@ class DoubleDelta {
 }  // namespace sm
 }  // namespace tiledb
 
-#endif  // TILEDB_GZIP_H
+#endif  // TILEDB_DOUBLE_DELTA_H

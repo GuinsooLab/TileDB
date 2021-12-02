@@ -120,6 +120,12 @@ void CompressionFilter::set_compression_level(int compressor_level) {
   level_ = compressor_level;
 }
 
+ResourcePool<ZStd::ZSTD_Decompress_Context>&
+CompressionFilter::zstd_decompress_context() {
+  static ResourcePool<ZStd::ZSTD_Decompress_Context> zstd_context_pool(16);
+  return zstd_context_pool;
+}
+
 FilterType CompressionFilter::compressor_to_filter(Compressor compressor) {
   switch (compressor) {
     case Compressor::NO_COMPRESSION:

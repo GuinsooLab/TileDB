@@ -34,7 +34,9 @@
 #define TILEDB_COMPRESSION_FILTER_H
 
 #include "tiledb/common/status.h"
+#include "tiledb/sm/compressors/zstd_compressor.h"
 #include "tiledb/sm/filter/filter.h"
+#include "tiledb/sm/misc/resource_pool.h"
 
 using namespace tiledb::common;
 
@@ -124,6 +126,9 @@ class CompressionFilter : public Filter {
 
   /** Set the compression level used by this filter instance. */
   void set_compression_level(int compressor_level);
+
+  /** Return the resource pool for ZSTD filter */
+  static ResourcePool<ZStd::ZSTD_Decompress_Context>& zstd_decompress_context();
 
  private:
   /** The compressor. */
