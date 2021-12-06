@@ -80,8 +80,7 @@ Status ZStd::compress(
 }
 
 Status ZStd::decompress(
-    std::shared_ptr<ResourcePool<ZStd::ZSTD_Decompress_Context>>
-        decompress_ctx_pool,
+    shared_ptr<ResourcePool<ZSTD_Decompress_Context>> decompress_ctx_pool,
     ConstBuffer* input_buffer,
     PreallocatedBuffer* output_buffer) {
   // Sanity check

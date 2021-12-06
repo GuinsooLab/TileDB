@@ -33,6 +33,7 @@
 #ifndef TILEDB_ZSTD_H
 #define TILEDB_ZSTD_H
 
+#include "tiledb/common/common.h"
 #include "tiledb/common/status.h"
 
 #include "tiledb/sm/misc/resource_pool.h"
@@ -88,8 +89,7 @@ class ZStd {
    * @return Status
    */
   static Status decompress(
-      std::shared_ptr<ResourcePool<ZStd::ZSTD_Decompress_Context>>
-          decompress_ctx_pool,
+      shared_ptr<ResourcePool<ZSTD_Decompress_Context>> decompress_ctx_pool,
       ConstBuffer* input_buffer,
       PreallocatedBuffer* output_buffer);
 
