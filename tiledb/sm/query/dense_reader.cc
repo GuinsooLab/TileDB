@@ -366,8 +366,8 @@ Status DenseReader::dense_read() {
 
   // Fill coordinates if the user requested them.
   if (!read_state_.overflowed_ && has_coords()) {
-    RETURN_CANCEL_OR_ERROR(fill_dense_coords<DimType>(subarray));
-    read_state_.overflowed_ = copy_overflowed_;
+    RETURN_CANCEL_OR_ERROR(
+        fill_dense_coords<DimType>(subarray, &read_state_.overflowed_));
   }
 
   return Status::Ok();
@@ -466,7 +466,6 @@ Status DenseReader::init_read_state() {
 
   read_state_.unsplittable_ = false;
   read_state_.overflowed_ = false;
-  copy_overflowed_ = false;
   read_state_.initialized_ = true;
 
   return Status::Ok();

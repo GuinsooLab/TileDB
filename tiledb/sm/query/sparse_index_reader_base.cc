@@ -569,6 +569,43 @@ Status SparseIndexReaderBase::apply_query_condition(
   return Status::Ok();
 }
 
+Status SparseIndexReaderBase::read_and_unfilter_attributes(
+    const uint64_t memory_budget,
+    const std::vector<std::string>* names,
+    const std::vector<uint64_t>* mem_usage_per_attr,
+    uint64_t* buffer_idx,
+    std::vector<std::string>* names_to_copy,
+    std::vector<ResultTile*>* result_tiles) {
+  auto timer_se = stats_->start_timer("read_and_unfilter_attribute");
+
+  std::vector<std::string> names_to_read;
+  uint64_t memory_used = 0;
+  while (*buffer_idx < names->size()) {
+    auto& name = names->at(*buffer_idx);
+    auto attr_mem_usage = mem_usage_per_attr->at(*buffer_idx);
+    if (memory_used + attr_mem_usage < memory_budget) {
+      memory_used += attr_mem_usage;
+
+      // We only read attributes, so dimensions have 0 cost.
+      if (attr_mem_usage != 0)
+        names_to_read.emplace_back(name);
+
+      names_to_copy->emplace_back(name);
+      (*buffer_idx)++;
+    } else {
+      break;
+    }
+  }
+
+  // Read and unfilter tiles.
+  RETURN_NOT_OK(read_attribute_tiles(&names_to_read, result_tiles, true));
+
+  for (auto& name : names_to_read)
+    RETURN_NOT_OK(unfilter_tiles(name, result_tiles, true));
+
+  return Status::Ok();
+}
+
 Status SparseIndexReaderBase::resize_output_buffers(uint64_t cells_copied) {
   // Resize buffers if the result cell slabs was truncated.
   for (auto& it : buffers_) {

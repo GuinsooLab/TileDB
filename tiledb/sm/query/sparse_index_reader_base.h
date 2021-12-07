@@ -118,6 +118,9 @@ class ResultTileWithBitmap : public ResultTile {
 
   /** Was the query condition processed for this tile. */
   bool qc_processed_;
+
+  /** Hilbert values for this tile. */
+  std::vector<uint64_t> hilbert_values_;
 };
 
 /**
@@ -138,9 +141,6 @@ class SparseIndexReaderBase : public ReaderBase {
 
   /** The state for a read sparse global order query. */
   struct ReadState {
-    /** The result cell slabs currently in process. */
-    std::vector<ResultCellSlab> result_cell_slabs_;
-
     /** The tile index inside of each fragments. */
     std::vector<std::pair<uint64_t, uint64_t>> frag_tile_idx_;
 
@@ -282,6 +282,19 @@ class SparseIndexReaderBase : public ReaderBase {
   /** Apply query condition. */
   template <class BitmapType>
   Status apply_query_condition(std::vector<ResultTile*>* result_tiles);
+
+  /**
+   * Read and unfilter as many attributes as can fit in the memory budget and
+   * return the names loaded in 'names_to_copy'. Also keep the 'buffer_idx'
+   * updated to keep track of progress.
+   */
+  Status read_and_unfilter_attributes(
+      const uint64_t memory_budget,
+      const std::vector<std::string>* names,
+      const std::vector<uint64_t>* mem_usage_per_attr,
+      uint64_t* buffer_idx,
+      std::vector<std::string>* names_to_copy,
+      std::vector<ResultTile*>* result_tiles);
 
   /**
    * Adds an extra offset in the end of the offsets buffer indicating the

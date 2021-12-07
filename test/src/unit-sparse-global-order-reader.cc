@@ -59,7 +59,6 @@ struct CSparseGlobalOrderFx {
   std::string ratio_tile_ranges_;
   std::string ratio_array_data_;
   std::string ratio_coords_;
-  std::string ratio_rcs_;
   std::string ratio_query_condition_;
 
   void create_default_array_1d();
@@ -106,7 +105,6 @@ void CSparseGlobalOrderFx::reset_config() {
   ratio_tile_ranges_ = "0.1";
   ratio_array_data_ = "0.1";
   ratio_coords_ = "0.5";
-  ratio_rcs_ = "0.05";
   ratio_query_condition_ = "0.25";
   update_config();
 }
@@ -158,14 +156,6 @@ void CSparseGlobalOrderFx::update_config() {
           config,
           "sm.mem.reader.sparse_global_order.ratio_coords",
           ratio_coords_.c_str(),
-          &error) == TILEDB_OK);
-  REQUIRE(error == nullptr);
-
-  REQUIRE(
-      tiledb_config_set(
-          config,
-          "sm.mem.reader.sparse_global_order.ratio_rcs",
-          ratio_rcs_.c_str(),
           &error) == TILEDB_OK);
   REQUIRE(error == nullptr);
 
@@ -593,95 +583,6 @@ TEST_CASE_METHOD(
 
   std::string error_str(msg);
   CHECK(error_str.find("Cannot load a single tile") != std::string::npos);
-}
-
-TEST_CASE_METHOD(
-    CSparseGlobalOrderFx,
-    "Sparse global order reader: rcs budget forcing one tile at a time",
-    "[sparse-global-order][small-rcs-budget]") {
-  // Create default array.
-  reset_config();
-  create_default_array_1d();
-
-  bool use_subarray = false;
-  SECTION("- No subarray") {
-    use_subarray = false;
-  }
-  SECTION("- Subarray") {
-    use_subarray = true;
-  }
-
-  int num_frags = 2;
-  for (int i = 1; i < num_frags + 1; i++) {
-    // Write a fragment.
-    int coords[] = {i,
-                    num_frags + i,
-                    2 * num_frags + i,
-                    3 * num_frags + i,
-                    4 * num_frags + i};
-    uint64_t coords_size = sizeof(coords);
-    int data[] = {i,
-                  num_frags + i,
-                  2 * num_frags + i,
-                  3 * num_frags + i,
-                  4 * num_frags + i};
-    uint64_t data_size = sizeof(data);
-    write_1d_fragment(coords, &coords_size, data, &data_size);
-  }
-
-  // One cell slab (24) will be bigger than the budget (10).
-  total_budget_ = "10000";
-  ratio_rcs_ = "0.001";
-  update_config();
-
-  tiledb_array_t* array = nullptr;
-  tiledb_query_t* query = nullptr;
-
-  uint32_t rc;
-  uint64_t coords_r_size;
-  uint64_t data_r_size;
-  for (int i = 0; i < 10; i++) {
-    // Try to read.
-    int coords_r[5];
-    int data_r[5];
-    coords_r_size = sizeof(coords_r);
-    data_r_size = sizeof(data_r);
-
-    if (i == 0) {
-      rc = read(
-          use_subarray,
-          false,
-          coords_r,
-          &coords_r_size,
-          data_r,
-          &data_r_size,
-          &query,
-          &array);
-    } else {
-      rc = tiledb_query_submit(ctx_, query);
-    }
-    CHECK(rc == TILEDB_OK);
-
-    // Check query status.
-    tiledb_query_status_t status;
-    tiledb_query_get_status(ctx_, query, &status);
-    CHECK(status == (i == 9 ? TILEDB_COMPLETED : TILEDB_INCOMPLETE));
-
-    // Should only read one value.
-    CHECK(4 == data_r_size);
-    CHECK(4 == coords_r_size);
-
-    int coords_c[] = {i + 1};
-    int data_c[] = {i + 1};
-    CHECK(!std::memcmp(coords_c, coords_r, coords_r_size));
-    CHECK(!std::memcmp(data_c, data_r, data_r_size));
-  }
-
-  // Clean up.
-  rc = tiledb_array_close(ctx_, array);
-  CHECK(rc == TILEDB_OK);
-  tiledb_array_free(&array);
-  tiledb_query_free(&query);
 }
 
 TEST_CASE_METHOD(

@@ -263,19 +263,6 @@ class SparseUnorderedWithDupsReader : public SparseIndexReaderBase,
       std::vector<ResultTile*>* result_tiles,
       std::vector<uint64_t>* total_mem_usage_per_attr);
 
-  /**
-   * Read and unfilter as many attributes as can fit in the memory budget and
-   * return the names loaded in 'names_to_copy'. Also keep the 'buffer_idx'
-   * updated to keep track of progress.
-   */
-  Status read_and_unfilter_attributes(
-      const uint64_t memory_budget,
-      const std::vector<std::string>* names,
-      const std::vector<uint64_t>* mem_usage_per_attr,
-      uint64_t* buffer_idx,
-      std::vector<std::string>* names_to_copy,
-      std::vector<ResultTile*>* result_tiles);
-
   /** Copy tiles. */
   template <class OffType>
   Status process_tiles(std::vector<ResultTile*>* result_tiles);

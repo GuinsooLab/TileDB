@@ -112,10 +112,6 @@ class SparseGlobalOrderReader : public SparseIndexReaderBase,
   /** Clears the result tiles. Used by serialization. */
   Status clear_result_tiles();
 
-  /** Add a result tile with no memory budget checks. Used by serialization. */
-  ResultTile* add_result_tile_unsafe(
-      unsigned f, uint64_t t, const ArraySchema* array_schema);
-
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
@@ -142,12 +138,6 @@ class SparseGlobalOrderReader : public SparseIndexReaderBase,
   /** Memory budget per fragment for qc tiles. */
   double per_fragment_qc_memory_;
 
-  /** Memory used for result cell slabs. */
-  uint64_t memory_used_rcs_;
-
-  /** How much of the memory budget is reserved for result cell slabs. */
-  double memory_budget_ratio_rcs_;
-
   /* ********************************* */
   /*           PRIVATE METHODS         */
   /* ********************************* */
@@ -162,14 +152,12 @@ class SparseGlobalOrderReader : public SparseIndexReaderBase,
       const ArraySchema* const array_schema,
       bool* budget_exceeded);
 
-  /** corrects memory usage after de-serialization. */
-  Status fix_memory_usage_after_serialization();
-
   /** Create the result tiles. */
   Status create_result_tiles(bool* tiles_found);
 
   /** Populate a result cell slab to process. */
-  Status compute_result_cell_slab();
+  Status compute_result_cell_slab(
+      std::vector<ResultCellSlab>* result_cell_slabs);
 
   /**
    * Add a new tile to the queue of tiles currently being processed
@@ -182,21 +170,21 @@ class SparseGlobalOrderReader : public SparseIndexReaderBase,
       uint64_t cell_idx,
       std::vector<std::list<ResultTileWithBitmap<uint8_t>>::iterator>&
           result_tiles_it,
-      std::vector<bool>& result_tile_used,
+      std::vector<uint8_t>& result_tile_used,
       std::priority_queue<ResultCoords, std::vector<ResultCoords>, T>&
           tile_queue,
       std::mutex& tile_queue_mutex,
-      T& cmp,
       bool* need_more_tiles);
 
-  /** Computes a tile's Hilbert values, stores them in the comparator. */
-  template <class T>
-  Status calculate_hilbert_values(
-      bool subarray_set, ResultTileWithBitmap<uint8_t>* tile, T& cmp);
+  /** Computes a tile's Hilbert values for a tile. */
+  Status compute_hilbert_values(std::vector<ResultTile*>* result_tiles);
 
   /** Compute the result cell slabs once tiles are loaded. */
   template <class T>
-  Status merge_result_cell_slabs(uint64_t memory_budget, T cmp);
+  Status merge_result_cell_slabs(
+      uint64_t num_cells,
+      std::vector<ResultCellSlab>* result_cell_slabs,
+      T cmp);
 
   /** Remove a result tile from memory */
   Status remove_result_tile(

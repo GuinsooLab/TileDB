@@ -78,9 +78,6 @@ SparseUnorderedWithDupsReader<BitmapType>::SparseUnorderedWithDupsReader(
           subarray,
           layout,
           condition) {
-  // Defines specific bahavior in the tile copy code for this reader.
-  fix_var_sized_overflows_ = true;
-  clear_coords_tiles_on_copy_ = false;
   array_memory_tracker_ =
       storage_manager_->array_memory_tracker(array->array_uri());
 }
@@ -1222,44 +1219,6 @@ Status SparseUnorderedWithDupsReader<BitmapType>::compute_var_size_offsets(
     return Status::SparseUnorderedWithDupsReaderError(
         "Var size buffer cannot fit a single cell for var attribute");
   }
-
-  return Status::Ok();
-}
-
-template <class BitmapType>
-Status SparseUnorderedWithDupsReader<BitmapType>::read_and_unfilter_attributes(
-    const uint64_t memory_budget,
-    const std::vector<std::string>* names,
-    const std::vector<uint64_t>* mem_usage_per_attr,
-    uint64_t* buffer_idx,
-    std::vector<std::string>* names_to_copy,
-    std::vector<ResultTile*>* result_tiles) {
-  auto timer_se = stats_->start_timer("read_and_unfilter_attribute");
-
-  std::vector<std::string> names_to_read;
-  uint64_t memory_used = 0;
-  while (*buffer_idx < names->size()) {
-    auto& name = names->at(*buffer_idx);
-    auto attr_mem_usage = mem_usage_per_attr->at(*buffer_idx);
-    if (memory_used + attr_mem_usage < memory_budget) {
-      memory_used += attr_mem_usage;
-
-      // We only read attributes, so dimensions have 0 cost.
-      if (attr_mem_usage != 0)
-        names_to_read.emplace_back(name);
-
-      names_to_copy->emplace_back(name);
-      (*buffer_idx)++;
-    } else {
-      break;
-    }
-  }
-
-  // Read and unfilter tiles.
-  RETURN_NOT_OK(read_attribute_tiles(&names_to_read, result_tiles, true));
-
-  for (auto& name : names_to_read)
-    RETURN_NOT_OK(unfilter_tiles(name, result_tiles, true));
 
   return Status::Ok();
 }
