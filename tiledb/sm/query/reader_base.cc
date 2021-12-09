@@ -619,6 +619,56 @@ Status ReaderBase::read_tiles(
   return Status::Ok();
 }
 
+Status ReaderBase::allocate_filtered_buffers(
+    Tile* const tile, ReaderBase::UnfilteredTile* unfiltered_tile) const {
+  assert(tile->filtered());
+
+  assert(tile->buffer());
+  assert(tile->buffer()->size() == 0);
+  if (tile->buffer()->size() > 0)
+    return LOG_STATUS(Status::FilterError(
+        "Filter error; tile has allocated uncompressed chunk buffers."));
+
+  Buffer* const filtered_buffer = tile->filtered_buffer();
+  if (filtered_buffer == nullptr)
+    return LOG_STATUS(
+        Status::FilterError("Filter error; tile has null buffer."));
+
+  // Make a pass over the tile to get the chunk information.
+  filtered_buffer->reset_offset();
+  uint64_t num_chunks;
+  RETURN_NOT_OK(filtered_buffer->read(&num_chunks, sizeof(uint64_t)));
+  auto& filtered_chunks = unfiltered_tile->filtered_chunks_;
+  auto& chunk_offsets = unfiltered_tile->chunk_offsets_;
+  filtered_chunks.resize(num_chunks);
+  chunk_offsets.resize(num_chunks);
+  uint64_t total_orig_size = 0;
+  for (uint64_t i = 0; i < num_chunks; i++) {
+    auto& chunk = filtered_chunks[i];
+    RETURN_NOT_OK(filtered_buffer->read(
+        &(chunk.unfiltered_data_size_), sizeof(uint32_t)));
+    RETURN_NOT_OK(
+        filtered_buffer->read(&(chunk.filtered_data_size_), sizeof(uint32_t)));
+    RETURN_NOT_OK(filtered_buffer->read(
+        &(chunk.filtered_metadata_size_), sizeof(uint32_t)));
+    chunk.filtered_metadata_ = filtered_buffer->cur_data();
+    chunk.filtered_data_ =
+        (char*)chunk.filtered_metadata_ + chunk.filtered_metadata_size_;
+
+    chunk_offsets[i] = total_orig_size;
+    total_orig_size += chunk.unfiltered_data_size_;
+
+    filtered_buffer->advance_offset(
+        chunk.filtered_metadata_size_ + chunk.filtered_data_size_);
+  }
+
+  assert(filtered_buffer->offset() == filtered_buffer->size());
+
+  RETURN_NOT_OK(tile->buffer()->realloc(total_orig_size));
+
+  return Status::Ok();
+}
+
 Status ReaderBase::unfilter_tiles(
     const std::string& name,
     const std::vector<ResultTile*>* result_tiles,
@@ -629,7 +679,73 @@ Status ReaderBase::unfilter_tiles(
 
   auto var_size = array_schema_->var_size(name);
   auto nullable = array_schema_->is_nullable(name);
-  auto num_tiles = static_cast<uint64_t>(result_tiles->size());
+  const auto num_tiles = static_cast<uint64_t>(result_tiles->size());
+
+  /*
+  We have to rethink how we parallelize in the filter pipeline for sure. I think
+  it will look a lot like the code I have in the bitmap calculations
+  (SparseIndexReaderBase::compute_tile_bitmaps) first look at the number of
+  tiles versus cores. If we have less tiles than core, we compute the size and
+  pre-allocate all unfiltered buffers (probably in parallel). Pre-allocating in
+  the case where we have more tiles than core will make the performance worse so
+  in this case we skip the preallocation and allocate like we do today close to
+  the processing of all chunks. Then we do a parallel for 2D that will
+  parallelize on tiles and "chunk ranges". Chunk ranges inside of the
+  parallel_for_2d will be processed in a regular for loop. The pre-allocation
+  step would also pre-compute offsets in the input buffer/output buffers for all
+  chunk ranges.
+  */
+
+  // Compute parallelization parameters.
+  uint64_t num_range_threads = 1;
+  const auto num_threads = storage_manager_->compute_tp()->concurrency_level();
+  if (num_tiles < num_threads) {
+    // Ceil the division between thread_num and num_tiles.
+    num_range_threads = 1 + ((num_threads - 1) / num_tiles);
+  }
+
+  std::vector<ReaderBase::UnfilteredTile> unfiltered_tiles(num_tiles);
+  // If the number of cores is greater or equal to the number of tiles,
+  // pre-allocate unfiltered buffers and pre-compute offsets.
+  if (num_range_threads != 1) {
+    auto status = parallel_for(
+        storage_manager_->compute_tp(), 0, num_tiles, [&](uint64_t i) {
+          ResultTile* const tile = result_tiles->at(i);
+
+          auto& fragment = fragment_metadata_[tile->frag_idx()];
+          auto format_version = fragment->format_version();
+
+          // Applicable for zipped coordinates only to versions < 5
+          // Applicable for separate coordinates only to version >= 5
+          if (name != constants::coords ||
+              (name == constants::coords && format_version < 5) ||
+              (array_schema_->is_dim(name) && format_version >= 5)) {
+            auto tile_tuple = tile->tile_tuple(name);
+
+            // Skip non-existent attributes/dimensions (e.g. coords in the
+            // dense case).
+            if (tile_tuple == nullptr ||
+                std::get<0>(*tile_tuple).filtered_buffer()->size() == 0)
+              return Status::Ok();
+
+            auto& t = std::get<0>(*tile_tuple);
+            return allocate_filtered_buffers(&t, &unfiltered_tiles.at(i));
+          } else
+            return Status::Ok();
+        });
+    RETURN_NOT_OK_ELSE(status, logger_->status(status));
+  }
+
+  // Unfilter all tiles/chunks in parallel.
+  /*
+  auto status = parallel_for_2d(
+      storage_manager_->compute_tp(),
+      0,
+      num_tiles,
+      0,
+      num_range_threads,
+      [&](uint64_t i, uint64_t range_thread_idx) {
+  */
 
   auto status = parallel_for(
       storage_manager_->compute_tp(), 0, num_tiles, [&, this](uint64_t i) {
