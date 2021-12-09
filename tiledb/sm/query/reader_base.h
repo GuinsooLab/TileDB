@@ -768,21 +768,8 @@ class ReaderBase : public StrategyBase {
       const std::vector<QueryBuffer*>& buffers,
       std::vector<uint64_t>* offsets) const;
 
-  struct UnfilteredTile {
-    struct DiskLayout {
-      uint32_t unfiltered_data_size_;
-      uint32_t filtered_data_size_;
-      uint32_t filtered_metadata_size_;
-      void* filtered_metadata_;
-      void* filtered_data_;
-    };
-
-    std::vector<uint64_t> chunk_offsets_;
-    std::vector<DiskLayout> filtered_chunks_;
-  };
-
-  Status allocate_filtered_buffers(
-      Tile* const tile, UnfilteredTile* unfiltered_tile) const;
+  Status prepare_unfiltering_buffers(
+      Tile* const tile, ChunkData* chunk_data) const;
 };
 
 }  // namespace sm
